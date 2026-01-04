@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>经典打砖块 - HTML网页小游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: "微软雅黑", sans-serif;
+            color: #fff;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #ffd700;
+            font-size: 28px;
+        }
+        .score {
+            font-size: 22px;
+            margin-bottom: 10px;
+            color: #61dafb;
+        }
+        #gameBox {
+            width: 800px;
+            height: 600px;
+            border: 3px solid #ffd700;
+            border-radius: 8px;
+            background-color: #000;
+            position: relative;
+            overflow: hidden;
+            cursor: none;
+        }
+        /* 挡板样式 */
+        #paddle {
+            width: 120px;
+            height: 15px;
+            background-color: #61dafb;
+            border-radius: 8px;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        /* 小球样式 */
+        #ball {
+            width: 20px;
+            height: 20px;
+            background-color: #ff4757;
+            border-radius: 50%;
+            position: absolute;
+        }
+        /* 砖块样式 */
+        .brick {
+            width: 78px;
+            height: 30px;
+            background: linear-gradient(45deg, #ffa502, #ff3838);
+            border: 1px solid #fff;
+            border-radius: 4px;
+            position: absolute;
+        }
+        /* 弹窗样式 */
+        #modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-size: 36px;
+            font-weight: bold;
+            z-index: 999;
+        }
+        #modal p {
+            margin-bottom: 30px;
+            color: #fff;
+        }
+        #restartBtn {
+            padding: 12px 30px;
+            font-size: 20px;
+            background-color: #ffd700;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #restartBtn:hover {
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>HTML 打砖块小游戏</h1>
+    <div class="score">得分: <span id="scoreNum">0</span></div>
+    <!-- 游戏主容器 -->
+    <div id="gameBox">
+        <div id="paddle"></div>
+        <div id="ball"></div>
+    </div>
+    <!-- 游戏弹窗 -->
+    <div id="modal">
+        <p id="modalText"></p>
+        <button id="restartBtn">重新开始游戏</button>
+    </div>
+
+    <script>
+        // 1. 获取游戏元素
+        const gameBox = document.getElementById('gameBox');
+        const paddle = document.getElementById('paddle');
+        const ball = document.getElementById('ball');
+        const scoreNum = document.getElementById('scoreNum');
+        const modal = document.getElementById('modal');
+        const modalText = document.getElementById('modalText');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // 2. 游戏基础参数
+        let score = 0;
+        let ballX = 400, ballY = 300; // 小球初始位置
+        let ballSpeedX = 5, ballSpeedY = -5; // 小球移动速度
+        let paddleX = 340; // 挡板初始位置
+        const paddleWidth = 120;
+        const gameWidth = 800;
+        const gameHeight = 600;
+        const brickRow = 6; // 砖块行数
+        const brickCol = 10; // 砖块列数
+        let bricks = []; // 砖块数组
+
+        // 3. 创建砖块墙
+        function createBricks() {
+            for(let i = 0; i < brickRow; i++) {
+                for(let j = 0; j < brickCol; j++) {
+                    const brick = document.createElement('div');
+                    brick.className = 'brick';
+                    brick.style.left = j * 80 + 1 + 'px';
+                    brick.style.top = i * 35 + 30 + 'px';
+                    gameBox.appendChild(brick);
+                    bricks.push(brick);
+                }
+            }
+        }
+
+        // 4. 鼠标控制挡板移动
+        gameBox.addEventListener('mousemove', (e) => {
+            // 获取鼠标在游戏框内的X坐标
+            const mouseX = e.clientX - gameBox.getBoundingClientRect().left;
+            // 限制挡板不超出游戏边界
+            paddleX = Math.max(0, Math.min(mouseX - paddleWidth/2, gameWidth - paddleWidth));
+            paddle.style.left = paddleX + 'px';
+        });
+
+        // 5. 游戏核心运动逻辑
+        function gameLoop() {
+            // 小球移动
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+            ball.style.left = ballX + 'px';
+            ball.style.top = ballY + 'px';
+
+            // 小球碰撞左右墙壁反弹
+            if(ballX <= 0 || ballX >= gameWidth - 20) {
+                ballSpeedX = -ballSpeedX;
+            }
+            // 小球碰撞顶部墙壁反弹
+            if(ballY <= 0) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            // 小球碰撞挡板反弹
+            const paddleTop = gameHeight - 35;
+            const paddleLeft = paddleX;
+            if(ballY >= paddleTop - 20 && ballX >= paddleLeft && ballX <= paddleLeft + paddleWidth) {
+                // 碰到挡板给小球一点加速度，游戏越来越难
+                ballSpeedY = -ballSpeedY - 0.2;
+                ballSpeedX = ballSpeedX + ( (ballX - (paddleLeft + paddleWidth/2)) / 20 );
+            }
+
+            // 小球掉落，游戏失败
+            if(ballY >= gameHeight) {
+                showModal('游戏失败！再接再厉 😥');
+                return;
+            }
+
+            // 小球碰撞砖块检测
+            bricks.forEach((brick, index) => {
+                const brickRect = brick.getBoundingClientRect();
+                const ballRect = ball.getBoundingClientRect();
+                // 判断小球和砖块是否碰撞
+                if(ballRect.right > brickRect.left && ballRect.left < brickRect.right &&
+                   ballRect.bottom > brickRect.top && ballRect.top < brickRect.bottom) {
+                    // 砖块消失
+                    brick.remove();
+                    bricks.splice(index, 1);
+                    // 小球反弹
+                    ballSpeedY = -ballSpeedY;
+                    // 加分
+                    score += 10;
+                    scoreNum.innerHTML = score;
+                    // 所有砖块击碎，游戏胜利
+                    if(bricks.length === 0) {
+                        showModal(`恭喜胜利！总分: ${score} 🎉`);
+                        return;
+                    }
+                }
+            });
+
+            // 循环执行游戏逻辑
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 6. 显示弹窗（胜利/失败）
+        function showModal(text) {
+            modalText.innerHTML = text;
+            modal.style.display = 'flex';
+        }
+
+        // 7. 重新开始游戏
+        function restartGame() {
+            // 重置参数
+            score = 0;
+            scoreNum.innerHTML = 0;
+            ballX = 400;
+            ballY = 300;
+            ballSpeedX = 5;
+            ballSpeedY = -5;
+            paddleX = 340;
+            paddle.style.left = paddleX + 'px';
+            // 清空所有砖块
+            bricks.forEach(brick => brick.remove());
+            bricks = [];
+            // 重新创建砖块
+            createBricks();
+            // 关闭弹窗
+            modal.style.display = 'none';
+            // 重新开始游戏循环
+            gameLoop();
+        }
+
+        // 绑定重新开始按钮事件
+        restartBtn.addEventListener('click', restartGame);
+
+        // 初始化游戏 - 创建砖块 + 启动游戏
+        createBricks();
+        gameLoop();
+    </script>
+</body>
+</html>
